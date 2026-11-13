@@ -64,7 +64,10 @@ class WeatherClient:
         try:
             response = requests.get(API_URL, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
         except requests.RequestException as exc:
-            raise WeatherAPIError(f"Network error for '{city}': {exc}") from exc
+            # Request exceptions may contain the full URL, including the API key.
+            raise WeatherAPIError(
+                f"Network error for '{city}'. Check your connection and try again."
+            ) from exc
 
         if response.status_code == 401:
             raise WeatherAPIError("Invalid API key (HTTP 401).")
@@ -73,7 +76,12 @@ class WeatherClient:
         if not response.ok:
             raise WeatherAPIError(f"HTTP {response.status_code}: {response.text[:200]}")
 
-        return WeatherReport.from_json(response.json())
+        try:
+            data = response.json()
+        except requests.exceptions.JSONDecodeError as exc:
+            raise WeatherAPIError("The weather service returned invalid JSON.") from exc
+
+        return WeatherReport.from_json(data)
 
 
 def print_summary(reports: list[WeatherReport]) -> None:
